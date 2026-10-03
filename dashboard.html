@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>C.C.O. Control Center V6</title>
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand-wrap">
+      <div class="brand-logo-shell"><img class="brand-logo" src="/static/logo.png" alt="C.C.O." onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="brand-logo-fallback">CCO</div></div>
+      <div><div class="brand-title">Control Center</div><div class="brand-sub">Operational Administration V6</div></div>
+    </div>
+    <nav class="nav-list">
+      {% if permissions.dashboard %}<button class="nav-item active" data-tab="dashboard"><span>◈</span>Dashboard</button>{% endif %}
+      {% if permissions.members %}<button class="nav-item" data-tab="members"><span>◎</span>Membri</button>{% endif %}
+      {% if permissions.timesheets %}<button class="nav-item" data-tab="timesheets"><span>◷</span>Pontaje</button>{% endif %}
+      {% if permissions.operations %}<button class="nav-item" data-tab="operations"><span>◆</span>Activitate Operativă</button>{% endif %}
+      {% if permissions.callsigns %}<button class="nav-item" data-tab="callsigns"><span>⌁</span>Callsign-uri</button>{% endif %}
+      {% if permissions.tickets %}<button class="nav-item" data-tab="tickets"><span>▱</span>Ticket-uri</button>{% endif %}
+      {% if permissions.testers %}<button class="nav-item" data-tab="testers"><span>◇</span>Testeri</button>{% endif %}
+      {% if permissions.sanctions %}<button class="nav-item" data-tab="sanctions"><span>⚠</span>Sancțiuni</button>{% endif %}
+      {% if permissions.inactivity %}<button class="nav-item" data-tab="inactivity"><span>◌</span>Inactivități</button>{% endif %}
+      {% if permissions.resignations %}<button class="nav-item" data-tab="resignations"><span>↪</span>Demisii</button>{% endif %}
+      {% if permissions.security %}<button class="nav-item" data-tab="security"><span>⬡</span>Security</button>{% endif %}
+      {% if permissions.backups %}<button class="nav-item" data-tab="backups"><span>▣</span>Backups</button>{% endif %}
+      {% if permissions.logs %}<button class="nav-item" data-tab="logs"><span>≡</span>Loguri</button>{% endif %}
+      {% if permissions.config %}<button class="nav-item" data-tab="config"><span>⚙</span>Configurare</button>{% endif %}
+      {% if permissions.superusers %}<button class="nav-item" data-tab="superusers"><span>♛</span>Superuser</button>{% endif %}
+    </nav>
+    <div class="sidebar-footer"><div class="avatar-dot">{{ user.username[:1]|upper }}</div><div class="user-meta"><b>{{ user.username }}</b><small>{% if user.is_owner %}Owner{% elif user.is_superuser %}Superuser{% else %}Conducere{% endif %}</small></div><a class="logout-btn" href="/logout">↗</a></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button id="sidebarToggle" class="icon-btn mobile-only">☰</button>
+      <div><div class="eyebrow">C.C.O. ADMINISTRATION</div><h1 id="pageTitle">Dashboard</h1></div>
+      <div class="top-actions"><div class="global-search"><span>⌕</span><input id="globalSearch" placeholder="Caută membru, callsign, ID..."><kbd>Ctrl K</kbd></div><div class="live-pill"><i></i>LIVE</div></div>
+    </header>
+    <div id="toastHost" class="toast-host"></div>
+
+    <section class="tab-page active" id="tab-dashboard">
+      <div class="hero-card"><div><span class="hero-kicker">OPERATIONAL OVERVIEW</span><h2>Centru de comandă C.C.O.</h2><p>Membri, pontaje, activitate operativă, sancțiuni, ticket-uri și securitate într-un singur loc.</p></div><div class="hero-status"><span>STATUS SISTEM</span><b>OPERAȚIONAL</b></div></div>
+      <div class="stats-grid" id="overviewStats"></div>
+      <div class="grid-2"><div class="panel-card"><div class="panel-head"><div><span class="section-kicker">ACTIVITATE</span><h3>Ore pontate — 7 zile</h3></div></div><div class="chart-wrap"><canvas id="hoursChart"></canvas></div></div><div class="panel-card"><div class="panel-head"><div><span class="section-kicker">LIVE FEED</span><h3>Activitate recentă</h3></div></div><div id="recentActivity" class="activity-feed"></div></div></div>
+    </section>
+
+    <section class="tab-page" id="tab-members">
+      <div class="section-top"><div><span class="section-kicker">PERSONNEL</span><h2>Registru membri</h2></div><button class="btn primary" onclick="openAddMember()">+ Adaugă membru</button></div>
+      <div class="toolbar-card"><div class="search-lg"><span>⌕</span><input id="memberSearch" placeholder="Username / nume / ID / callsign"></div><select id="memberStatus"><option value="all">Toate statusurile</option><option value="active">Activi</option><option value="inactive">Inactivi aprobați</option><option value="suspended">Suspendați</option><option value="out">OUT</option><option value="demisionat">Demisionați</option><option value="removed">Eliminați</option></select><select id="memberRank"><option value="all">Toate gradele</option>{% for r in ranks %}<option>{{ r.name }}</option>{% endfor %}</select><select id="memberTester"><option value="all">Toți</option><option value="yes">Testeri</option><option value="no">Non-testeri</option></select></div>
+      <div class="panel-card"><div class="panel-head"><h3>Membri C.C.O.</h3><span id="membersCount" class="soft-badge"></span></div><div class="table-wrap"><table><thead><tr><th>Membru</th><th>Callsign</th><th>Grad</th><th>ID</th><th>Tester</th><th>Status</th><th></th></tr></thead><tbody id="membersTable"></tbody></table></div></div>
+    </section>
+
+    <section class="tab-page" id="tab-timesheets">
+      <div class="toolbar-card"><select id="timePeriod"><option value="today">Azi</option><option value="yesterday">Ieri</option><option value="week" selected>7 zile</option><option value="month">Luna curentă</option><option value="last_month">Luna trecută</option><option value="all">Total</option></select><select id="timeStatus"><option value="all">Toate</option><option value="active">Active</option><option value="closed">Închise</option><option value="cancelled">Anulate</option></select><input id="timeUser" placeholder="Discord ID membru"><button class="btn ghost" onclick="loadTimesheets()">Aplică</button><a class="btn primary" href="/export/timesheets.csv">Export CSV</a></div>
+      <div class="mini-stats"><div><span>Total perioadă</span><b id="timeTotal">0h 0m</b></div><div><span>Pontaje afișate</span><b id="timeCount">0</b></div></div>
+      <div class="panel-card"><div class="table-wrap"><table><thead><tr><th>Membru</th><th>Grad</th><th>Clock In</th><th>Clock Out</th><th>Durată</th><th>Status</th><th>Anulat de</th></tr></thead><tbody id="timesheetsTable"></tbody></table></div></div>
+    </section>
+
+    <section class="tab-page" id="tab-operations">
+      <div class="section-top"><div><span class="section-kicker">CASEWORK</span><h2>Activitate Operativă</h2></div><div class="bulk-actions"><button class="btn success" onclick="bulkReview('accept')">Acceptă selectate</button><button class="btn danger" onclick="bulkReview('reject')">Respinge selectate</button></div></div>
+      <div class="toolbar-card"><select id="opKind" onchange="loadOperations()"><option value="all">Toate tipurile</option><option value="buletin">Buletine</option><option value="filaj">Filaje</option><option value="interogatoriu">Interogatorii</option><option value="actiune">Acțiuni</option></select><select id="opStatus" onchange="loadOperations()"><option value="all">Toate statusurile</option><option value="pending">În așteptare</option><option value="accepted">Acceptate</option><option value="rejected">Respinse</option></select><input id="opUser" placeholder="Discord ID" onkeydown="if(event.key==='Enter')loadOperations()"></div>
+      <div class="panel-card"><div class="table-wrap"><table><thead><tr><th><input type="checkbox" id="opAll" onchange="toggleAllOps(this.checked)"></th><th>#</th><th>Tip</th><th>Autor</th><th>Subiect</th><th>Status</th><th>Creat</th><th>Reviewer</th></tr></thead><tbody id="operationsTable"></tbody></table></div></div>
+      <div class="panel-card"><div class="panel-head"><h3>Cereri de Acțiune</h3></div><div class="table-wrap"><table><thead><tr><th>#</th><th>Solicitant</th><th>Tip</th><th>Ora</th><th>Status</th><th>Interval aprobat</th><th></th></tr></thead><tbody id="actionRequestsTable"></tbody></table></div></div>
+    </section>
+
+    <section class="tab-page" id="tab-callsigns">
+      <div class="section-top"><div><span class="section-kicker">IDENTIFICATION</span><h2>Callsign Command Center</h2><p class="muted">Pool separat pentru fiecare grad. Gradele de Conducere folosesc callsign-uri text, gradele operative folosesc intervale numerice.</p></div><div class="section-actions"><button class="btn ghost" onclick="openRangeModal()">+ Interval numeric</button>{% if user.is_owner or user.is_superuser %}<button class="btn primary" onclick="openLeadershipCallsignModal()">+ Callsign Conducere</button>{% endif %}</div></div>
+      <div class="callout premium-callout"><div><b>Regulă automată</b><span>1 callsign liber = atribuire automată · mai multe = alegere · zero = operația se oprește.</span></div><span class="shield-chip">DUPLICATE GUARD ON</span></div>
+      <div id="leadershipCallsigns" class="leadership-rank-grid"></div>
+      <div class="section-divider"><span>CALLSIGN-URI NUMERICE</span></div>
+      <div id="callsignRanges" class="range-grid"></div>
+    </section>
+
+    <section class="tab-page" id="tab-tickets"><div class="toolbar-card"><select id="ticketStatus" onchange="loadTickets()"><option value="all">Toate</option><option value="open">Deschise</option><option value="closed">Închise</option></select></div><div class="panel-card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Tip</th><th>Creator</th><th>Responsabil</th><th>Status</th><th>Creat</th><th>Transcript</th></tr></thead><tbody id="ticketsTable"></tbody></table></div></div></section>
+    <section class="tab-page" id="tab-testers"><div class="panel-card"><div class="panel-head"><h3>Testeri C.C.O.</h3></div><div class="table-wrap"><table><thead><tr><th>Membru</th><th>Callsign</th><th>Grad</th><th>Rol tester</th></tr></thead><tbody id="testersTable"></tbody></table></div></div></section>
+
+    <section class="tab-page" id="tab-sanctions"><div class="section-top"><div><span class="section-kicker">DISCIPLINE</span><h2>Sancțiuni</h2></div></div><div class="info-strip"><b>AV 1/1</b><span>•</span><b>al doilea AV activ = FW</b><span>•</span><b>FW 1/3 → 2/3 → 3/3</b><span>•</span><strong>toate expiră în 7 zile · FW 3/3 = OUT automat</strong></div><div class="panel-card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Membru</th><th>Sancțiune</th><th>Motiv</th><th>Autor</th><th>Expiră</th><th>Status</th><th>Dovadă</th></tr></thead><tbody id="sanctionsTable"></tbody></table></div></div></section>
+
+    <section class="tab-page" id="tab-inactivity"><div class="section-top"><div><span class="section-kicker">AVAILABILITY</span><h2>Cereri Inactivitate</h2></div></div><div class="panel-card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Membru</th><th>Grad</th><th>Durată</th><th>Motiv</th><th>Status</th><th>Perioadă</th><th></th></tr></thead><tbody id="inactivityTable"></tbody></table></div></div></section>
+    <section class="tab-page" id="tab-resignations"><div class="section-top"><div><span class="section-kicker">SEPARATION</span><h2>Cereri Demisie</h2></div></div><div class="panel-card"><div class="table-wrap"><table><thead><tr><th>#</th><th>Membru</th><th>Grad</th><th>Motiv</th><th>PK</th><th>Status</th><th></th></tr></thead><tbody id="resignationsTable"></tbody></table></div></div></section>
+
+    <section class="tab-page" id="tab-security"><div class="section-top"><div><span class="section-kicker">DEFENSE LAYER</span><h2>Security Center</h2><p class="muted">Role Lock, Permission Guard, Protected Rank Roles, Nickname Restore, command guard și protecții anti-abuz.</p></div><div class="security-score">SECURITY <b>ACTIVE</b></div></div><div id="securityCards" class="security-grid"></div><div class="grid-2"><div class="panel-card"><div class="panel-head"><h3>Setări avansate</h3><button class="btn primary" onclick="saveSecurity()">Salvează</button></div><div id="securityAdvanced" class="form-grid"></div></div><div class="panel-card"><div class="panel-head"><h3>Whitelist Security</h3></div><div class="inline-form"><input id="wlUser" placeholder="Discord User ID"><input id="wlScope" value="all"><button class="btn primary" onclick="whitelistAdd()">Adaugă</button></div><div id="whitelistList" class="chips-list"></div><hr class="soft-line"><div class="panel-head"><div><h3>Protected Users</h3><p class="muted">Protecție suplimentară la ban/kick și acțiuni critice.</p></div></div><div class="inline-form"><input id="protectedUserId" placeholder="Discord User ID"><input id="protectedUserNote" placeholder="Notă"><button class="btn primary" onclick="protectedUserAdd()">Protejează</button></div><div id="protectedUsersList" class="chips-list"></div></div></div></section>
+    <section class="tab-page" id="tab-backups"><div class="section-top"><div><span class="section-kicker">RECOVERY</span><h2>Backups & Snapshots</h2></div><button class="btn primary" onclick="createBackup()">+ Snapshot acum</button></div><div class="panel-card"><div class="table-wrap"><table><thead><tr><th>ID</th><th>Tip</th><th>Roluri</th><th>Canale</th><th>Data</th></tr></thead><tbody id="backupsTable"></tbody></table></div></div></section>
+    <section class="tab-page" id="tab-logs"><div class="toolbar-card"><input id="logSearch" placeholder="Actor / target / detalii"><select id="logType"><option value="all">Toate tipurile</option></select><button class="btn ghost" onclick="loadLogs()">Filtrează</button></div><div class="panel-card"><div id="logsFeed" class="logs-feed"></div></div></section>
+    <section class="tab-page" id="tab-config"><div class="section-top"><div><span class="section-kicker">SYSTEM MAP</span><h2>Configurare Discord</h2></div><button class="btn primary" onclick="saveConfig()">Salvează configurarea</button></div><div class="grid-2"><div class="panel-card"><h3>Roluri</h3><div id="configRoles" class="form-grid one"></div></div><div class="panel-card"><h3>Canale & categorii</h3><div id="configChannels" class="form-grid one"></div></div></div></section>
+    <section class="tab-page" id="tab-superusers"><div class="section-top"><div><span class="section-kicker">PRIVILEGED ACCESS</span><h2>Superuser Management</h2></div>{% if user.is_owner %}<div class="inline-form compact"><input id="superuserId" placeholder="Discord User ID"><button class="btn primary" onclick="addSuperuser()">Adaugă</button></div>{% endif %}</div><div id="superusersGrid" class="user-grid"></div></section>
+  </main>
+</div>
+
+<div class="modal" id="memberModal"><div class="modal-card modal-xl"><button class="modal-close" onclick="closeModal('memberModal')">×</button><div id="memberProfile"></div></div></div>
+<div class="modal" id="rangeModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('rangeModal')">×</button><span class="section-kicker">NUMERIC CALLSIGN RANGE</span><h2>Interval callsign</h2><div class="form-grid one"><label>Grad<select id="rangeRank">{% for r in ranks %}{% if loop.index0 < 6 %}<option>{{ r.name }}</option>{% endif %}{% endfor %}</select></label><label>Prefix<input id="rangePrefix" placeholder="D"></label><div class="split"><label>Start<input id="rangeStart" type="number" min="1"></label><label>Stop<input id="rangeStop" type="number" min="1"></label></div><button class="btn primary full" onclick="saveRange()">Salvează intervalul</button></div></div></div>
+
+<div class="modal" id="leadershipCallsignModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('leadershipCallsignModal')">×</button><span class="section-kicker">COMMAND CALLSIGN</span><h2 id="leadCallsignModalTitle">Adaugă callsign</h2><input type="hidden" id="leadCallsignId"><div class="form-grid one"><label>Grad<select id="leadCallsignRank">{% for r in ranks %}{% if loop.index0 >= 6 %}<option>{{ r.name }}</option>{% endif %}{% endfor %}</select></label><label>Callsign<input id="leadCallsignValue" maxlength="32" placeholder="ex. CAPITALA"></label><label>Notă<input id="leadCallsignNote" maxlength="120" placeholder="opțional"></label><div class="modal-actions"><button class="btn ghost" onclick="closeModal('leadershipCallsignModal')">Anulează</button><button class="btn primary" onclick="saveLeadershipCallsign()">Salvează</button></div></div></div></div>
+
+<div class="modal" id="criticalModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('criticalModal')">×</button><span class="section-kicker danger-text">CRITICAL CONFIRMATION</span><h2 id="criticalTitle">Confirmă acțiunea</h2><p id="criticalText" class="muted"></p><label>Scrie <b>CONFIRM</b><input id="criticalInput" autocomplete="off" placeholder="CONFIRM"></label><div class="modal-actions"><button class="btn ghost" onclick="closeModal('criticalModal')">Anulează</button><button class="btn danger" id="criticalAccept">Confirmă acțiunea</button></div></div></div>
+
+<div class="modal" id="addMemberModal"><div class="modal-card"><button class="modal-close" onclick="closeModal('addMemberModal')">×</button><span class="section-kicker">PERSONNEL CREATE</span><h2>Adaugă membru</h2><div class="form-grid one"><label>Discord User ID<input id="newMemberUser" placeholder="123456789..."></label><label>Nume<input id="newMemberFirst" placeholder="Cristian"></label><label>Prenume<input id="newMemberLast" placeholder="Armando"></label><label>ID<input id="newMemberInternal" placeholder="6374"></label><label>Grad<select id="newMemberRank" onchange="refreshNewMemberCallsigns()">{% for r in ranks %}<option>{{ r.name }}</option>{% endfor %}</select></label><label>Callsign<select id="newMemberCallsign"><option value="">Se atribuie automat</option></select></label><button class="btn primary full" onclick="saveNewMember()">Salvează membru</button></div></div></div>
+
+<script>window.CCO={csrf:{{ csrf_token|tojson }},isOwner:{{ user.is_owner|tojson }},isSuperuser:{{ user.is_superuser|default(false)|tojson }},isLeadership:{{ user.is_leadership|default(false)|tojson }},permissions:{{ permissions|tojson }}};</script>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>
